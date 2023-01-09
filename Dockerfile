@@ -1,36 +1,36 @@
-# Base image https://hub.docker.com/u/rocker/
-FROM rocker/shiny:latest
+FROM openanalytics/r-ver:4.1.3
+
+LABEL maintainer="Tobias Verbeke <tobias.verbeke@openanalytics.eu>"
 
 # system libraries of general use
-## install debian packages
-RUN apt-get update -qq && apt-get -y --no-install-recommends install \
-    libxml2-dev \
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    pandoc \
+    pandoc-citeproc \
+    libcurl4-gnutls-dev \
     libcairo2-dev \
-    libsqlite3-dev \
-    libmariadbd-dev \
-    libpq-dev \
+    libxt-dev \
+    libssl-dev \
     libssh2-1-dev \
-    unixodbc-dev \
-    libcurl4-openssl-dev \
-    libssl-dev
+    libssl1.1 \
+    && rm -rf /var/lib/apt/lists/*
 
-## update system libraries
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get clean
+# system library dependency for the euler app
+RUN apt-get update && apt-get install -y \
+    libmpfr-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# copy necessary files
-## app folder
-COPY /undp ./apps
-## renv.lock file
-#COPY /example-app/renv.lock ./renv.lock
+# basic shiny functionality
+RUN R -q -e "install.packages(c('shiny', 'rmarkdown', 'leaflet'))"
 
-# install renv & restore packages
-RUN Rscript -e 'install.packages("renv")'
-RUN Rscript -e 'renv::restore()'
+# install dependencies of the euler app
+RUN R -q -e "install.packages('Rmpfr')"
 
-# expose port
+# copy the app to the image
+RUN mkdir /root/euler
+COPY euler /root/euler
+
+COPY Rprofile.site /usr/local/lib/R/etc/
+
 EXPOSE 3838
 
-# run app on container start
-CMD ["R", "-e", "shiny::runApp('/apps', host = '0.0.0.0', port = 3838)"]
+CMD ["R", "-q", "-e", "shiny::runApp('/root/euler')"]
